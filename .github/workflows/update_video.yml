@@ -19,6 +19,7 @@ jobs:
         run: sudo apt-get install ffmpeg
 
       - name: Download Graph Image (Advanced Spoof)
+        # Adds Referer (to satisfy .htaccess) and Accept headers (to satisfy Browsers/WAF)
         run: |
           curl -v \
           -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
@@ -34,7 +35,9 @@ jobs:
           echo "Checking file type..."
           if [[ $(file -b --mime-type solar_graph.png) == "text/html" ]]; then
             echo "❌ ERROR: Downloaded HTML Error Page instead of Image!"
+            echo "--- SERVER RESPONSE START ---"
             cat solar_graph.png | head -n 20
+            echo "--- SERVER RESPONSE END ---"
             exit 1
           fi
 
@@ -46,7 +49,6 @@ jobs:
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          # FORCE ADD (-f) to override .gitignore
           git add -f solar_graph.mp4
           git commit -m "Update solar video" || echo "No changes to commit"
           git push
