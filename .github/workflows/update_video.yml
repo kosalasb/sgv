@@ -42,8 +42,11 @@ jobs:
           fi
 
       - name: Convert to MP4 Video
+        # 1. Increase duration to 15s (allows buffering time)
+        # 2. Add -movflags +faststart (Critical for streaming!)
+        # 3. Add -r 30 (Force 30fps for compatibility)
         run: |
-          ffmpeg -loop 1 -i solar_graph.png -c:v libx264 -t 5 -pix_fmt yuv420p -vf "scale=1280:-2" -y solar_graph.mp4
+          ffmpeg -loop 1 -i solar_graph.png -c:v libx264 -t 15 -r 30 -pix_fmt yuv420p -vf "scale=1280:-2" -movflags +faststart -y solar_graph.mp4
 
       - name: Commit and Push Video
         run: |
