@@ -41,12 +41,16 @@ jobs:
             exit 1
           fi
 
-      - name: Convert to MP4 Video
-        # 1. Increase duration to 15s (allows buffering time)
-        # 2. Add -movflags +faststart (Critical for streaming!)
-        # 3. Add -r 30 (Force 30fps for compatibility)
+      - name: Convert to MP4 Video (Broadcast Safe)
         run: |
-          ffmpeg -loop 1 -i solar_graph.png -c:v libx264 -t 15 -r 30 -pix_fmt yuv420p -vf "scale=1280:-2" -movflags +faststart -y solar_graph.mp4
+          ffmpeg -loop 1 -i solar_graph.png \
+          -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 \
+          -c:v libx264 -profile:v main -level 3.1 -preset medium \
+          -c:a aac -shortest \
+          -t 15 \
+          -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p" \
+          -movflags +faststart \
+          -y solar_graph.mp4
 
       - name: Commit and Push Video
         run: |
