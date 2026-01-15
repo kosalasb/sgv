@@ -1,0 +1,18 @@
+# --- Security (Critical) ---
+.env
+token_cache_*.json
+
+# --- Logs & Temp Data ---
+sync_log.txt
+solcast_central_cache.json
+latest_solar_data.json
+
+# --- Generated Media ---
+solar_graph.png
+solar_graph.mp4
+camera_stream.php
+
+# --- System Files ---
+.DS_Store
+Thumbs.db
+error_log
