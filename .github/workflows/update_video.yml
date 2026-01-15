@@ -1,0 +1,35 @@
+name: Generate Solar Video
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Install FFmpeg
+        run: sudo apt-get install ffmpeg
+
+      - name: Download Graph Image (Securely)
+        run: |
+          curl -H "X-Solar-Key: ${{ secrets.SOLAR_KEY }}" -L -o solar_graph.png "${{ secrets.SOLAR_URL }}"
+
+      - name: Convert to MP4 Video
+        run: |
+          ffmpeg -loop 1 -i solar_graph.png -c:v libx264 -t 5 -pix_fmt yuv420p -vf "scale=1280:-2" -y solar_graph.mp4
+
+      - name: Commit and Push Video
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add solar_graph.mp4
+          git commit -m "Update solar video" || echo "No changes to commit"
+          git push
