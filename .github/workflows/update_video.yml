@@ -2,9 +2,8 @@ name: Generate Solar Video
 
 on:
   schedule:
-    # Run every 5 minutes
     - cron: '*/5 * * * *'
-  workflow_dispatch: # Allows manual run button
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -19,16 +18,21 @@ jobs:
       - name: Install FFmpeg
         run: sudo apt-get install ffmpeg
 
-      - name: Download Graph Image (Bypass Security)
-        # We spoof a Windows Chrome browser (-A) to bypass Cloudflare/Hotlink protection
+      - name: Download Graph Image (Advanced Spoof)
+        # Adds Referer (to satisfy .htaccess) and Accept headers (to satisfy Browsers/WAF)
         run: |
-          curl -v -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" -H "X-Solar-Key: ${{ secrets.SOLAR_KEY }}" -L -o solar_graph.png "${{ secrets.SOLAR_URL }}"
+          curl -v \
+          -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+          -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8" \
+          -H "Accept-Language: en-US,en;q=0.9" \
+          -H "Referer: https://solar.kandiv.lk/" \
+          -H "X-Solar-Key: ${{ secrets.SOLAR_KEY }}" \
+          -L -o solar_graph.png \
+          "${{ secrets.SOLAR_URL }}"
 
       - name: Verify Image Download
-        # If the download is HTML (error page), fail the job and show the error text
         run: |
           echo "Checking file type..."
-          file solar_graph.png
           if [[ $(file -b --mime-type solar_graph.png) == "text/html" ]]; then
             echo "❌ ERROR: Downloaded HTML Error Page instead of Image!"
             echo "--- SERVER RESPONSE START ---"
@@ -38,7 +42,6 @@ jobs:
           fi
 
       - name: Convert to MP4 Video
-        # Create a 5-second video loop
         run: |
           ffmpeg -loop 1 -i solar_graph.png -c:v libx264 -t 5 -pix_fmt yuv420p -vf "scale=1280:-2" -y solar_graph.mp4
 
@@ -47,6 +50,5 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git add solar_graph.mp4
-          # Only commit if the file has changed to keep history clean
           git commit -m "Update solar video" || echo "No changes to commit"
           git push
