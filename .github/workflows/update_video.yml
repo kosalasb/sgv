@@ -18,8 +18,8 @@ jobs:
       - name: Install FFmpeg
         run: sudo apt-get install ffmpeg
 
-      - name: Download Graph Image (Advanced Spoof)
-        # Adds Referer (to satisfy .htaccess) and Accept headers (to satisfy Browsers/WAF)
+      # --- IMAGE 1: THE GRAPH ---
+      - name: Download Graph Image
         run: |
           curl -v \
           -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
@@ -27,28 +27,46 @@ jobs:
           -H "Accept-Language: en-US,en;q=0.9" \
           -H "Referer: https://solar.kandiv.lk/" \
           -H "X-Solar-Key: ${{ secrets.SOLAR_KEY }}" \
-          -L -o solar_graph.png \
+          -L -o graph.png \
           "${{ secrets.SOLAR_URL }}"
 
-      - name: Verify Image Download
+      # --- IMAGE 2: THE SUMMARY ---
+      - name: Download Summary Image
+        # Same secure logic, but adds ?view=summary to the URL
         run: |
-          echo "Checking file type..."
-          if [[ $(file -b --mime-type solar_graph.png) == "text/html" ]]; then
-            echo "❌ ERROR: Downloaded HTML Error Page instead of Image!"
-            echo "--- SERVER RESPONSE START ---"
-            cat solar_graph.png | head -n 20
-            echo "--- SERVER RESPONSE END ---"
+          curl -v \
+          -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+          -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8" \
+          -H "Accept-Language: en-US,en;q=0.9" \
+          -H "Referer: https://solar.kandiv.lk/" \
+          -H "X-Solar-Key: ${{ secrets.SOLAR_KEY }}" \
+          -L -o summary.png \
+          "${{ secrets.SOLAR_URL }}?view=summary"
+
+      - name: Verify Downloads
+        run: |
+          echo "Checking file types..."
+          # Check Graph
+          if [[ $(file -b --mime-type graph.png) == "text/html" ]]; then
+            echo "❌ ERROR: Graph download failed (Got HTML)."
+            exit 1
+          fi
+          # Check Summary
+          if [[ $(file -b --mime-type summary.png) == "text/html" ]]; then
+            echo "❌ ERROR: Summary download failed (Got HTML)."
             exit 1
           fi
 
-      - name: Convert to MP4 Video (Broadcast Safe)
+      - name: Create Slideshow Video
+        # Inputs: [0]=Graph (10s), [1]=Summary (5s)
+        # Filter: Scales both to 720p, adds black bars, joins them.
         run: |
-          ffmpeg -loop 1 -i solar_graph.png \
+          ffmpeg -loop 1 -t 10 -i graph.png -loop 1 -t 5 -i summary.png \
           -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 \
-          -c:v libx264 -profile:v main -level 3.1 -preset medium \
+          -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];[1:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];[v0][v1]concat=n=2:v=1:a=0[v]" \
+          -map "[v]" -map 2:a \
+          -c:v libx264 -profile:v main -level 3.1 -preset medium -pix_fmt yuv420p \
           -c:a aac -shortest \
-          -t 15 \
-          -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p" \
           -movflags +faststart \
           -y solar_graph.mp4
 
