@@ -44,7 +44,7 @@ jobs:
           "${{ secrets.SOLAR_URL }}?view=summary"
 
       # --- IMAGE 3: THE FLOW ---
-      - name: Download Summary Image
+      - name: Download Flow Image
         # Same secure logic, but adds ?view=summary to the URL
         run: |
           curl -v \
@@ -76,18 +76,18 @@ jobs:
           fi
 
       - name: Create Slideshow Video
-        # Inputs: [0]=Graph (10s), [1]=Summary (10s), [2]=Flow (10s)
-        # Filter: Scales both to 720p, adds black bars, joins them.
+        # FIX: Updated concat=n=3 to join all 3 image streams
+        # Inputs: [0]=Graph, [1]=Summary, [2]=Flow
         run: |
           ffmpeg -loop 1 -t 10 -i graph.png -loop 1 -t 10 -i summary.png -loop 1 -t 10 -i flow.png \
           -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 \
-          -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];[1:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];[v0][v1]concat=n=2:v=1:a=0[v]" \
-          -map "[v]" -map 2:a \
+          -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];[1:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];[2:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1[v2];[v0][v1][v2]concat=n=3:v=1:a=0[v]" \
+          -map "[v]" -map 3:a \
           -c:v libx264 -profile:v main -level 3.1 -preset medium -pix_fmt yuv420p \
           -c:a aac -shortest \
           -movflags +faststart \
           -y solar_graph.mp4
-
+          
       - name: Commit and Push Video
         run: |
           git config --global user.name "GitHub Actions"
