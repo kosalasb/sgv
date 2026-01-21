@@ -43,6 +43,19 @@ jobs:
           -L -o summary.png \
           "${{ secrets.SOLAR_URL }}?view=summary"
 
+      # --- IMAGE 3: THE FLOW ---
+      - name: Download Summary Image
+        # Same secure logic, but adds ?view=summary to the URL
+        run: |
+          curl -v \
+          -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+          -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8" \
+          -H "Accept-Language: en-US,en;q=0.9" \
+          -H "Referer: https://solar.kandiv.lk/" \
+          -H "X-Solar-Key: ${{ secrets.SOLAR_KEY }}" \
+          -L -o flow.png \
+          "${{ secrets.SOLAR_URL }}?view=flow"
+
       - name: Verify Downloads
         run: |
           echo "Checking file types..."
@@ -56,12 +69,17 @@ jobs:
             echo "❌ ERROR: Summary download failed (Got HTML)."
             exit 1
           fi
+          # Check Flow
+          if [[ $(file -b --mime-type flow.png) == "text/html" ]]; then
+            echo "❌ ERROR: Summary download failed (Got HTML)."
+            exit 1
+          fi
 
       - name: Create Slideshow Video
-        # Inputs: [0]=Graph (10s), [1]=Summary (5s)
+        # Inputs: [0]=Graph (10s), [1]=Summary (10s), [2]=Flow (10s)
         # Filter: Scales both to 720p, adds black bars, joins them.
         run: |
-          ffmpeg -loop 1 -t 10 -i graph.png -loop 1 -t 5 -i summary.png \
+          ffmpeg -loop 1 -t 10 -i graph.png -loop 1 -t 10 -i summary.png -loop 1 -t 10 -i flow.png \
           -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 \
           -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];[1:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];[v0][v1]concat=n=2:v=1:a=0[v]" \
           -map "[v]" -map 2:a \
